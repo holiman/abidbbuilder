@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/signer/core"
 	"io/ioutil"
 	"log"
 	"os"
@@ -89,6 +91,24 @@ func dumpData(db map[string]string, outfile string) error {
 	return ioutil.WriteFile(outfile, data, 0644)
 
 }
+func testSelector(selector string, id []byte) error {
+	abistring, err := core.MethodSelectorToAbi(selector)
+	if err != nil {
+		return err
+	}
+	abistruct, err := abi.JSON(strings.NewReader(string(abistring)))
+	if err != nil {
+		return err
+	}
+	m, err := abistruct.MethodById(id)
+	if err != nil {
+		return err
+	}
+	if m.Sig() != selector {
+		return fmt.Errorf("Expected equality: %v != %v", m.Sig(), selector)
+	}
+	return nil
+}
 func readFiles(dir string) (map[string]string, error) {
 	f, err := os.Open(dir)
 	if err != nil {
@@ -124,6 +144,10 @@ func readFiles(dir string) (map[string]string, error) {
 			continue
 		}
 		selector := strings.TrimSpace(selectors[0])
+		if err = testSelector(selector, sig); err != nil {
+			fmt.Printf("Bad selector: %v\n", selector)
+			continue
+		}
 		// We do a basic sanity check here, not fully verifying the correctness of
 		// arguments, e.g the parameter types. We assume that the 4byte db comes
 		// from a somewhat trusted source
