@@ -22,13 +22,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/signer/core"
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -42,14 +42,14 @@ func init() {
 		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-i directory -o outputfile")
 		flag.PrintDefaults()
 		fmt.Fprintln(os.Stderr, `
-This is a little helper-utility to collect the data from 
-https://github.com/ethereum-lists/4bytes and massage it into a 
-clef-digestable format. 
+This is a little helper-utility to collect the data from
+https://github.com/ethereum-lists/4bytes and massage it into a
+clef-digestable format.
 
 It parses the signatures from the given directory, and writes
 them to the given outputfile as a json struct.
 
-Afterwards, you can do 
+Afterwards, you can do
 
    [cmd/clef]$ go-bindata resources
 
@@ -92,7 +92,7 @@ func dumpData(db map[string]string, outfile string) error {
 
 }
 func testSelector(selector string, id []byte) error {
-	abistring, err := core.MethodSelectorToAbi(selector)
+	abistring, err := parseSelector(selector)
 	if err != nil {
 		return err
 	}
@@ -158,4 +158,42 @@ func readFiles(dir string) (map[string]string, error) {
 		db[fmt.Sprintf("%x", sig)] = selector
 	}
 	return db, nil
+}
+
+// selectorRegexp is used to validate that a 4byte database selector corresponds
+// to a valid ABI function declaration.
+//
+// Note, although uppercase letters are not part of the ABI spec, this regexp
+// still accepts it as the general format is valid. It will be rejected later
+// by the type checker.
+var selectorRegexp = regexp.MustCompile(`^([^\)]+)\(([A-Za-z0-9,\[\]]*)\)`)
+
+// parseSelector converts a method selector into an ABI JSON spec. The returned
+// data is a valid JSON string which can be consumed by the standard abi package.
+func parseSelector(selector string) ([]byte, error) {
+	// Define a tiny fake ABI struct for JSON marshalling
+	type fakeArg struct {
+		Type string `json:"type"`
+	}
+	type fakeABI struct {
+		Name   string    `json:"name"`
+		Type   string    `json:"type"`
+		Inputs []fakeArg `json:"inputs"`
+	}
+	// Validate the selector and extract it's components
+	groups := selectorRegexp.FindStringSubmatch(selector)
+	if len(groups) != 3 {
+		return nil, fmt.Errorf("invalid selector %s (%v matches)", selector, len(groups))
+	}
+	name := groups[1]
+	args := groups[2]
+
+	// Reassemble the fake ABI and constuct the JSON
+	arguments := make([]fakeArg, 0)
+	if len(args) > 0 {
+		for _, arg := range strings.Split(args, ",") {
+			arguments = append(arguments, fakeArg{arg})
+		}
+	}
+	return json.Marshal([]fakeABI{{name, "function", arguments}})
 }
