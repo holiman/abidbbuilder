@@ -136,12 +136,11 @@ func readFiles(dir string) (map[string]string, error) {
 		}
 		selectors := strings.Split(string(dat), ";")
 		if len(selectors) > 1 {
-			fmt.Printf("sig `%s`\n", sig)
+			fmt.Printf("sig `%x`\n", sig)
 			for _, selector := range selectors {
 				fmt.Printf(" - %v\n", selector)
 			}
-			fmt.Println(" -- ignoring this signature\n")
-			continue
+			fmt.Println(" -- using first one\n")
 		}
 		selector := strings.TrimSpace(selectors[0])
 		if err = testSelector(selector, sig); err != nil {
