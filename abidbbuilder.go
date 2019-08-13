@@ -22,15 +22,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/signer/core"
 	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/iancoleman/orderedmap"
 )
 
 var (
@@ -83,12 +83,17 @@ func main() {
 	}
 }
 
-func dumpData(db map[string]string, outfile string) error {
-	data, err := json.Marshal(db)
+func dumpData(db *orderedmap.OrderedMap, outfile string) error {
+	fmt.Println("Sorting data...")
+	db.Sort(func(a *orderedmap.Pair, b *orderedmap.Pair) bool {
+		return a.Key() < b.Key()
+	})
+	fmt.Println("Marshalling data...")
+	data, err := json.MarshalIndent(db, "", "")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("data size %d kB\n", len(data)/1000)
+	fmt.Println("Saving data to %v...", outfile)
 	return ioutil.WriteFile(outfile, data, 0644)
 
 }
@@ -110,7 +115,7 @@ func testSelector(selector string, id []byte) error {
 	}
 	return nil
 }
-func readFiles(dir string) (map[string]string, error) {
+func readFiles(dir string) (*orderedmap.OrderedMap, error) {
 	f, err := os.Open(dir)
 	if err != nil {
 		log.Fatal(err)
@@ -120,7 +125,7 @@ func readFiles(dir string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	db := make(map[string]string)
+	db := orderedmap.New()
 	for _, file := range files {
 		// Only bother with signature files
 		sig, err := hex.DecodeString(file.Name())
@@ -156,7 +161,7 @@ func readFiles(dir string) (map[string]string, error) {
 			fmt.Printf("Erroneous selector: %s, have %x want %x", selector, sig, want)
 			continue
 		}
-		db[fmt.Sprintf("%x", sig)] = selector
+		db.Set(fmt.Sprintf("%x", sig), selector)
 	}
 	return db, nil
 }
