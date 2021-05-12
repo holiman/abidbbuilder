@@ -110,8 +110,8 @@ func testSelector(selector string, id []byte) error {
 	if err != nil {
 		return err
 	}
-	if m.Sig() != selector {
-		return fmt.Errorf("Expected equality: %v != %v", m.Sig(), selector)
+	if m.Sig != selector {
+		return fmt.Errorf("Expected equality: %v != %v", m.Sig, selector)
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func readFiles(dir string) (*orderedmap.OrderedMap, error) {
 		}
 		selector := strings.TrimSpace(selectors[0])
 		if err = testSelector(selector, sig); err != nil {
-			fmt.Printf("Bad selector: %v\n", selector)
+			fmt.Printf("Bad selector: %v, err: %v\n", selector, err)
 			continue
 		}
 		// We do a basic sanity check here, not fully verifying the correctness of
